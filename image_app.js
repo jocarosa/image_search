@@ -12,7 +12,7 @@ var offset= url_parts.query.offset;
 
 //console.log(query);
 
-var Model1 = require('db/model1.js');
+var Model1 = require('model1.js');
 
 
 Model1.paginate({},{ page: offset, limit: 10 },function(err,result){
