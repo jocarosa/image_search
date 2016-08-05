@@ -1,72 +1,81 @@
-var express = require('express');
-var app = express();
-var mongoose = require('mongoose');
-mongoose.connect('mongodb://localhost:27017/');
-var url=require('url');
+var express     = require('express');
+var app         = express();
+var request     = require('request');
+var url         = require('url');
+var modelRecent = require('./public/model/recent');
+var mongoose    = require('mongoose');
 
-app.all('*',function(req,res){
+require('dotenv').load();
+mongoose.connect(process.env.MONGO_URI);
+app.use(express.static('public'));
+
+
+app.get('/api/imagesearch/:query',function(req,res){
    
+   var search  = url.parse(req.url).pathname.split('/')[3]; // input query
+   var offset  = req.param('offset');
+   var query   = 'q=' + search +'&count=10&offset='+offset +'&mkt=en-us&safeSearch=Moderate'; //url query
+   var options = {
+     uri: 'https://api.cognitive.microsoft.com/bing/v5.0/images/search?' +
+       query,
+     headers: {
+       'Ocp-Apim-Subscription-Key': process.env.KEYIMAGESEARCH
+       }
+     };
+   
+    var cont  = [];
  
-var url_parts= url.parse(req.url,true);
-var offset= url_parts.query.offset;
-
-//console.log(query);
-
-var Model1 = require('model1.js');
-
-
-Model1.paginate({},{ page: offset, limit: 10 },function(err,result){
-    if(err)console.log('err paginate');
-    res.send(result.docs);
+    request(options,function(err,response,body){
+    
+      var images = JSON.parse(body).value;
+      
+    
+        function callback(element){
+           
+            cont.push({
+               name         : element.name,
+               url          : element.hostPageDisplayUrl,
+               thumbnailUrl : element.thumbnailUrl,
+               content      : element.contentUrl
+               
+            });
+           
+        }
+       
+      images.forEach(callback);
+      res.end(JSON.stringify(cont));
+    
+    });
+   
+    //saving last query
+    
+    var recently = new modelRecent(
+        { term: search, when:new Date() 
+            
+        });
+    recently.save(function(err,doc){console.log('save recently')})
 });
 
 
 
-
-
-
-/*
-var obModel1= new Model1({"url":"https://s-media-cache-ak0.pinimg.com/236x/4f/eb/97/4feb97594932dfc987d24c8af0769077.jpg","snippet":"Funniest Lolcats | funny cat","thumbnail":"https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcSOjnwL5b_V1r5nPdDK4eE8-S0bRBW19Sjx2ugTwTQgMOAm18Wl_tBGcQ",
-"context":"https://www.pinterest.com/pin/464504149043842668/"});
-
-for(var i=0;i<3;i++){
-
-obModel1.save(function(err){
-    if(err){return err}
-    console.log('save...');
+app.get('/recently',function(req,res){
+    
+var cont=[];
+    
+    modelRecent.find({},function(err,doc){
+        
+        doc.forEach(function(element){
+            cont.push({
+                term : element.term,
+                when : element.when
+            });
+             
+        });
+       
+       res.end(JSON.stringify(cont));
+    });
     
 });
-
-}*/
-
-
-//Model1.remove('url:https://s-media-cache-ak0.pinimg.com/236x/4f/eb/97/4feb97594932dfc987d24c8af0769077.jpg',function(){});
-
-/*
-Model1.find({}, usersProjection, function (err, urls) {
-    if (err) return(err);
-    res.send(urls);
-});*/
-
-});
-
-
-/*
-Model1.findOne({id:id},function(err,data){
-      if(err)console.log('data error');  
- 
- // res.redirect(301, data.url);
-
-      console.log(data.url);
-     
-
- 
-});
-*/
-
-
-
-
 
 
 var port = process.env.PORT || 8080;
