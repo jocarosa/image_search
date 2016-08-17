@@ -1,1 +1,1 @@
-web: image_app.js
+web: node image_app.js
